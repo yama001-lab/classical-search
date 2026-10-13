@@ -80,13 +80,14 @@ function show(view) {
   $("#app").hidden = view !== "app";
 }
 
-let state = { view: "albums", tracks: [], albums: [], filtered: false };
+let state = { view: "albums", tracks: [], albums: [], filtered: false, query: { tracks: "", albums: "" } };
 
 function renderResults() {
   const out = $("#results");
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("on", b.dataset.view === state.view));
   if (state.view === "albums") {
-    out.innerHTML = state.albums.length ? renderAlbums(state.albums) : '<p class="muted">該当するアルバムがありません。条件を減らして試してください。</p>';
+    out.innerHTML = (state.albums.length ? renderAlbums(state.albums) : '<p class="muted">該当するアルバムがありません。条件を減らして試してください。</p>') +
+      `<p class="note">Spotifyへの検索: <code>${esc(state.query.albums)}</code></p>`;
   } else {
     const works = groupTracks(state.tracks);
     out.innerHTML =
@@ -106,7 +107,7 @@ async function onSearch(e) {
   out.innerHTML = '<p class="muted">検索中…</p>';
   try {
     const { tracks, albums } = await search(q);
-    state = { view: state.view, tracks, albums, filtered: !!f.label };
+    state = { view: state.view, tracks, albums, filtered: !!f.label, query: q };
     $("#tabs").hidden = false;
     renderResults();
   } catch (err) {
@@ -122,6 +123,7 @@ async function onSearch(e) {
 // ---- Open Opus 連携（失敗しても検索は使える）
 let composerIds = new Map();
 let timer;
+function ooStatus(t) { $("#oo-status").textContent = t; }
 function fillList(listId, values) {
   $("#" + listId).innerHTML = values.map((v) => `<option value="${esc(v)}">`).join("");
 }
@@ -135,14 +137,20 @@ async function onComposerInput() {
       const cs = await searchComposers(term);
       composerIds = new Map(cs.map((c) => [c.name, c.id]));
       fillList("composer-list", cs.map((c) => c.name));
-    } catch {}
+      ooStatus(cs.length ? `Open Opus: 候補 ${cs.length}件（${cs.slice(0, 3).map((c) => c.name).join("、")}…）` : "Open Opus: 該当する作曲家なし");
+    } catch (e) {
+      ooStatus("Open Opusに接続できません: " + e.message);
+    }
   }, 250);
 }
 async function loadWorks(id) {
   try {
     const ws = await worksOf(id, "Recommended");
     fillList("work-list", ws.map((w) => w.title));
-  } catch {}
+    ooStatus(`Open Opus: 作品候補 ${ws.length}件（作品名欄をタップ）`);
+  } catch (e) {
+    ooStatus("Open Opusの作品を取得できません: " + e.message);
+  }
 }
 
 async function init() {
@@ -160,7 +168,7 @@ async function init() {
     const b = e.target.closest("[data-view]");
     if (b) { state.view = b.dataset.view; renderResults(); }
   });
-  popularComposers().then((cs) => { composerIds = new Map(cs.map((c) => [c.name, c.id])); fillList("composer-list", cs.map((c) => c.name)); }).catch(() => {});
+  popularComposers().then((cs) => { composerIds = new Map(cs.map((c) => [c.name, c.id])); fillList("composer-list", cs.map((c) => c.name)); }).catch((e) => ooStatus("Open Opusに接続できません: " + e.message));
   try {
     await handleRedirect();
   } catch (e) {
