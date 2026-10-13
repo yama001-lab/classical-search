@@ -22,3 +22,11 @@ assert.equal(g.length, 2);
 assert.equal(g[0].recordings.length, 2);
 assert.equal(g[0].recordings[0].movements[0].name, "I. Allegro");
 console.log("ok");
+
+import { buildQuery } from "./query.js";
+assert.deepEqual(buildQuery({ composer: "Beethoven", work: "Symphony No. 5", performer: "Karajan" }),
+  { tracks: "Beethoven Symphony No. 5 Karajan", albums: "Beethoven Symphony No. 5 Karajan" });
+assert.equal(buildQuery({ composer: "Bach", label: "Decca", yearFrom: "1960", yearTo: "1969" }).albums,
+  'Bach year:1960-1969 label:"Decca"');
+assert.equal(buildQuery({ composer: "Bach", yearFrom: "1975" }).tracks.startsWith("Bach year:1975-"), true);
+console.log("query ok");
