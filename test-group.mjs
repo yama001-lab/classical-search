@@ -25,8 +25,14 @@ console.log("ok");
 
 import { buildQuery } from "./query.js";
 assert.deepEqual(buildQuery({ composer: "Beethoven", work: "Symphony No. 5", performer: "Karajan" }),
-  { tracks: "Beethoven Symphony No. 5 Karajan", albums: "Beethoven Symphony No. 5 Karajan" });
+  { tracks: "Beethoven Symphony No. 5 Karajan", albums: "Beethoven Symphony No. 5 Karajan", albumsPlain: "Beethoven Symphony No. 5 Karajan" });
 assert.equal(buildQuery({ composer: "Bach", label: "Decca", yearFrom: "1960", yearTo: "1969" }).albums,
   'Bach year:1960-1969 label:"Decca"');
 assert.equal(buildQuery({ composer: "Bach", yearFrom: "1975" }).tracks.startsWith("Bach year:1975-"), true);
 console.log("query ok");
+
+import { matchesLabel } from "./query.js";
+assert.equal(matchesLabel("Decca", [{ text: "℗ 1963 Decca Music Group Limited" }]), true);
+assert.equal(matchesLabel("Decca", [{ text: "℗ 1963 Sony" }]), false);
+assert.equal(matchesLabel("Decca", undefined), false);
+console.log("label ok");

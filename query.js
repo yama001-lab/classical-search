@@ -15,6 +15,29 @@ export const LABELS = [
   ["ECM", "ECM"],
 ];
 
+// 著作権表記（℗ 1963 Decca Music Group...）に含まれる語で、レーベルを判定する
+export const LABEL_WORDS = {
+  "Deutsche Grammophon": ["deutsche grammophon", "universal international music"],
+  Decca: ["decca"],
+  Philips: ["philips"],
+  "EMI Classics": ["emi"],
+  "Warner Classics": ["warner"],
+  "Sony Classical": ["sony", "cbs"],
+  "RCA Red Seal": ["rca"],
+  "Mercury Living Presence": ["mercury"],
+  "Harmonia Mundi": ["harmonia mundi"],
+  Hyperion: ["hyperion"],
+  Chandos: ["chandos"],
+  Naxos: ["naxos"],
+  ECM: ["ecm"],
+};
+
+export function matchesLabel(label, copyrights) {
+  const words = LABEL_WORDS[label] || [label.toLowerCase()];
+  const text = (copyrights || []).map((c) => c.text).join(" ").toLowerCase();
+  return words.some((w) => text.includes(w));
+}
+
 const clean = (s) => (s || "").replace(/["]/g, " ").replace(/\s+/g, " ").trim();
 
 // f: { composer, work, performer, label, yearFrom, yearTo }
@@ -29,5 +52,5 @@ export function buildQuery(f) {
   }
   const base = parts.join(" ");
   const label = clean(f.label);
-  return { tracks: base, albums: label ? `${base} label:"${label}"`.trim() : base };
+  return { tracks: base, albums: label ? `${base} label:"${label}"`.trim() : base, albumsPlain: base };
 }

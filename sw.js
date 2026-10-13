@@ -1,5 +1,5 @@
 // アプリ本体だけをキャッシュする。API(Spotify)通信は常にネットワークへ。
-const CACHE = "classical-v3";
+const CACHE = "classical-v4";
 const FILES = ["./", "index.html", "app.js", "auth.js", "group.js", "config.js", "query.js", "openopus.js", "style.css", "manifest.webmanifest", "icons/icon.svg"];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) =>

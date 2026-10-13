@@ -1,6 +1,6 @@
 import { handleRedirect, login, logout, getToken, redirectUri } from "./auth.js";
 import { groupTracks } from "./group.js";
-import { buildQuery, LABELS } from "./query.js";
+import { buildQuery, matchesLabel, LABELS } from "./query.js";
 import { searchComposers, popularComposers, worksOf } from "./openopus.js";
 
 const $ = (s) => document.querySelector(s);
@@ -19,18 +19,33 @@ async function api(path, params) {
   return res.json();
 }
 
-async function search(q) {
+async function search(q, label) {
   const run = (query, type) => {
     const calls = [];
     for (let i = 0; i < PAGES; i++) calls.push(api("/search", { q: query, type, limit: LIMIT, offset: i * LIMIT }));
     return Promise.all(calls);
   };
   const uniq = (items) => [...new Map(items.filter(Boolean).map((x) => [x.id, x])).values()];
+  const albumsOf = (pages) => uniq(pages.flatMap((p) => (p.albums ? p.albums.items : [])));
   const [tp, ap] = await Promise.all([run(q.tracks, "track"), run(q.albums, "album")]);
-  return {
-    tracks: uniq(tp.flatMap((p) => (p.tracks ? p.tracks.items : []))),
-    albums: uniq(ap.flatMap((p) => (p.albums ? p.albums.items : []))),
-  };
+  const tracks = uniq(tp.flatMap((p) => (p.tracks ? p.tracks.items : [])));
+  let albums = albumsOf(ap);
+  let note = "";
+  if (label && albums.length === 0) {
+    // label: 絞り込みが効かないとき: ラベル指定なしで検索し、各アルバムの著作権表記で判定する
+    const plain = albumsOf(await run(q.albumsPlain, "album"));
+    const detailed = [];
+    for (let i = 0; i < plain.length; i += 5) {
+      const batch = await Promise.all(plain.slice(i, i + 5).map((a) => api("/albums/" + a.id, {}).catch(() => null)));
+      detailed.push(...batch.filter(Boolean));
+    }
+    const withInfo = detailed.filter((d) => d.copyrights && d.copyrights.length);
+    albums = withInfo.filter((d) => matchesLabel(label, d.copyrights));
+    note = withInfo.length
+      ? `レーベル指定は著作権表記で判定しました（${plain.length}件中${albums.length}件が一致）。`
+      : "Spotifyがレーベル情報を返さないため、レーベルでは絞り込めませんでした。";
+  }
+  return { tracks, albums, note };
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -70,7 +85,7 @@ function renderAlbums(albums) {
         ${img ? `<img src="${esc(img.url)}" alt="" loading="lazy">` : '<img alt="">'}
         <div class="meta"><div class="t">${esc(a.name)}</div>
         <div class="a">${esc(a.artists.map((x) => x.name).join(", "))}</div>
-        <div class="y">${esc((a.release_date || "").slice(0, 4))}</div></div></a></li>`;
+        <div class="y">${esc((a.release_date || "").slice(0, 4))}${a.copyrights && a.copyrights[0] ? " · " + esc(a.copyrights[0].text.replace(/^[℗©Ⓟ(PC)\s]+/, "").slice(0, 40)) : ""}</div></div></a></li>`;
     })
     .join("") + `</ul>`;
 }
@@ -80,14 +95,14 @@ function show(view) {
   $("#app").hidden = view !== "app";
 }
 
-let state = { view: "albums", tracks: [], albums: [], filtered: false, query: { tracks: "", albums: "" } };
+let state = { view: "albums", tracks: [], albums: [], filtered: false, query: { tracks: "", albums: "" }, note: "" };
 
 function renderResults() {
   const out = $("#results");
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("on", b.dataset.view === state.view));
   if (state.view === "albums") {
     out.innerHTML = (state.albums.length ? renderAlbums(state.albums) : '<p class="muted">該当するアルバムがありません。条件を減らして試してください。</p>') +
-      `<p class="note">Spotifyへの検索: <code>${esc(state.query.albums)}</code></p>`;
+      (state.note ? `<p class="note">${esc(state.note)}</p>` : "") + `<p class="note">Spotifyへの検索: <code>${esc(state.query.albums)}</code></p>`;
   } else {
     const works = groupTracks(state.tracks);
     out.innerHTML =
@@ -106,8 +121,8 @@ async function onSearch(e) {
   const out = $("#results");
   out.innerHTML = '<p class="muted">検索中…</p>';
   try {
-    const { tracks, albums } = await search(q);
-    state = { view: state.view, tracks, albums, filtered: !!f.label, query: q };
+    const { tracks, albums, note } = await search(q, f.label);
+    state = { view: state.view, tracks, albums, filtered: !!f.label, query: q, note };
     $("#tabs").hidden = false;
     renderResults();
   } catch (err) {
@@ -137,7 +152,9 @@ async function onComposerInput() {
       const cs = await searchComposers(term);
       composerIds = new Map(cs.map((c) => [c.name, c.id]));
       fillList("composer-list", cs.map((c) => c.name));
-      ooStatus(cs.length ? `Open Opus: 候補 ${cs.length}件（${cs.slice(0, 3).map((c) => c.name).join("、")}…）` : "Open Opus: 該当する作曲家なし");
+      const hit = cs.find((c) => c.name.toLowerCase() === term.toLowerCase());
+      if (hit) loadWorks(hit.id);
+      else ooStatus(cs.length ? `Open Opus: 候補 ${cs.length}件（${cs.slice(0, 3).map((c) => c.name).join("、")}…）` : "Open Opus: 該当する作曲家なし");
     } catch (e) {
       ooStatus("Open Opusに接続できません: " + e.message);
     }
