@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Classical Search</title>
+  <meta name="theme-color" content="#1b1b1f">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><h1>Classical Search</h1><button id="logout-btn" class="link" type="button">ログアウト</button></header>
+  <main>
+    <section id="login" hidden>
+      <p>Spotifyのクラシックを、楽章ではなく作品ごとに検索します。</p>
+      <button id="login-btn" type="button">Spotifyでログイン</button>
+      <p id="login-error" class="error"></p>
+      <p class="muted small">Spotify Dashboardに登録するRedirect URI: <code id="redirect"></code></p>
+    </section>
+    <section id="app" hidden>
+      <form id="form" role="search">
+        <input id="q" type="search" placeholder="例: ベートーヴェン 交響曲第5番 / Brahms Symphony 4" autocomplete="off" required>
+        <button type="submit">検索</button>
+      </form>
+      <div id="results"></div>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
